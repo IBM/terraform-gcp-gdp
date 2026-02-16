@@ -1,0 +1,81 @@
+#
+# Copyright (c) IBM Corp. 2026
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# examples/phase0bastion/terraform.tfvars
+# Phase 0: Bastion Host and Base Infrastructure
+
+# GCP Authentication & Project
+project_id       = "Customer_Project_ID"
+region           = "us-central1"
+zone             = "us-central1-a"
+credentials_file = "./key.json"
+
+# Network Configuration
+network_name   = "guardium-vpc"
+subnet_name    = "guardium-subnet"
+subnet_cidr    = "10.0.0.0/24"
+firewall_name  = "guardium-firewall"
+
+# Bastion Configuration
+bastion_name           = "guardium-bastion"
+bastion_machine_type   = "e2-standard-2"
+bastion_private_ip     = "10.0.1.10"
+management_subnet_name = "management-subnet"
+management_subnet_cidr = "10.0.1.0/24"
+
+
+# Resource creation flags
+# Set to false if resources already exist in your GCP project
+create_vpc               = true   # Set to false if guardium-vpc exists
+create_subnet            = true # Set to false if guardium-subnet exists
+create_nat               = true # Set to false if NAT/router already exists
+create_firewalls         = true # Set to false if firewall rules already exist
+create_management_subnet = true  # Set to false if management-subnet exists
+create_bastion           = true  # Set to false if bastion instance already exists
+create_bastion_firewalls = true # Set to false if bastion firewall rules already exist
+create_bastion_ip        = true  # Set to false if bastion external IP already exists
+
+
+# Security Configuration
+allowed_source_ips = [
+  "170.225.223.17/32",
+]
+
+# SSH Configuration
+admin_username = "gcpuser"
+
+#######################################################################
+# SSH Public Key - REPLACE with your actual public key
+#ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC... your-public-key-here"
+
+# SSH Private Key - REPLACE with your actual private key
+# NOTE: For production, use Azure Key Vault or other secure storage
+ssh_private_key = <<-EOT
+-----BEGIN OPENSSH PRIVATE KEY-----
+#your-private-key-content-here
+-----END OPENSSH PRIVATE KEY-----
+EOT
+
+
+
+# IMPORTANT: Replace these with your actual SSH keys
+#_ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC... [YOUR_PUBLIC_KEY_HERE]"
+
+ssh_private_key = <<-EOT
+-----BEGIN OPENSSH PRIVATE KEY-----
+[YOUR_PRIVATE_KEY_CONTENT_HERE]
+-----END OPENSSH PRIVATE KEY-----
+EOT
+
+# Labels (GCP equivalent of tags)
+labels = {
+  project     = "guardium"
+  environment = "production"
+  managed_by  = "terraform"
+  mode        = "private"
+  phase       = "0"
+  platform    = "gcp"
+}
+
