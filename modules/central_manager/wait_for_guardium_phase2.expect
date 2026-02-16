@@ -1,0 +1,82 @@
+#!/usr/bin/expect
+
+#
+# Copyright (c) IBM Corp. 2026
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# modules/central_manager/wait_for_guardium_phase2.expect
+# Phase 2: Additional Guardium configuration after Phase 1 completion
+
+# Set timeout
+set timeout 240
+
+# Arguments: IP, final password, shared_secret
+set ip [lindex $argv 0]
+set final_pw [lindex $argv 1]
+set shared_secret [lindex $argv 2]
+
+# Enable debugging (optional)
+exp_internal 1
+
+puts "Starting Guardium Phase 2 configuration..."
+puts "Connecting to $ip..."
+
+# SSH connection using the final password from Phase 1
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=60 cli@$ip
+
+set timeout 120
+expect {
+    -re "cli@.*password:" {
+        send "$final_pw\r"
+        exp_continue
+    }
+    -re "Last login:" {
+        exp_continue
+    }
+    -re "WARNING:" {
+        exp_continue
+    }
+    -re "System is now operational" {
+        exp_continue
+    }
+    -re ".*>" {
+        puts "Successfully connected to Guardium CLI"
+    }
+    timeout {
+        puts "WARNING: Timeout during connection - system may still be restarting"
+        exit 1
+    }
+    eof {
+        puts "ERROR: Connection failed"
+        exit 1
+    }
+}
+
+# Phase 2 configuration commands
+puts "Checking license status..."
+send -- "show license\r"
+expect ">"
+
+puts "Setting unit type to manager..."
+send -- "store unit type manager\r"
+sleep 10
+expect ">"
+
+puts "Verifying unit type..."
+send -- "show unit type\r"
+sleep 10
+expect ">"
+
+puts "Setting shared secret..."
+send -- "store system shared secret $shared_secret\r"
+sleep 10
+expect ">"
+
+puts "Phase 2 configuration completed. Exiting..."
+send -- "quit\r"
+expect eof
+
+puts "Guardium Phase 2 configuration completed successfully"
+exit 0
+

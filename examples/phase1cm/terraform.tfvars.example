@@ -1,0 +1,43 @@
+#
+# Copyright (c) IBM Corp. 2026
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# examples/phase1cm/terraform.tfvars
+# Phase 1: Central Manager Deployment
+
+# GCP Authentication & Project
+project_id       = "Customer_Project_ID"
+region           = "us-central1"
+zone             = "us-central1-a"
+credentials_file = "./key.json"
+
+# Network Configuration (use existing from Phase 0)
+network_name = "guardium-vpc"
+subnet_name  = "guardium-subnet"
+subnet_cidr  = "10.0.0.0/24"
+
+# Network Infrastructure (use existing from Phase 0)
+use_existing_vpc    = true
+use_existing_subnet = true
+
+# Guardium Image Configuration
+
+guardium_aggregator_image_id = "projects/aesthetic-frame-155821/global/images/guardium-v12-1-aggregator"
+# Machine type (4 vCPUs, 32GB RAM)
+guardium_machine_type = "n2-highmem-4"
+
+# Central Manager Configuration Files
+cm_config_json_path    = "central_manager_config.json"
+cm_instances_json_path = "central_manager_config.json"
+
+# Labels
+labels = {
+  project     = "guardium"
+  environment = "production"
+  managed_by  = "terraform"
+  component   = "central-manager"
+  phase       = "1"
+  platform    = "gcp"
+}
+

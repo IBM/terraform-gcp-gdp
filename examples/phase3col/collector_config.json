@@ -1,0 +1,39 @@
+{
+  "collectors": [
+    {
+      "vm_name": "col01",
+      "system_hostname": "col01",
+      "instance_type": "n2-highmem-4",
+      "network_interface_ip": "10.0.0.20",
+      "system_domain": "guardium.local",
+      "network_interface_mask": "/24",
+      "network_routes_defaultroute": "10.0.0.1",
+      "network_resolvers1": "169.254.169.254",
+      "network_resolvers2": "169.254.169.253",
+      "system_clock_timezone": "America/New_York",
+      "guardium_cli_default_password": "guardium",
+      "guardium_final_pw": "Customer_CLI_Final_Password",
+      "guardium_shared_secret": "Customer_Shared_Secret_Password",
+      "guardium_central_manager_ip": "10.0.0.10",
+      "guardium_license_key": "LeaveEmptyForCollector"
+    },
+    {
+      "vm_name": "col02",
+      "system_hostname": "col02",
+      "instance_type": "n2-highmem-4",
+      "network_interface_ip": "10.0.0.21",
+      "system_domain": "guardium.local",
+      "network_interface_mask": "/24",
+      "network_routes_defaultroute": "10.0.0.1",
+      "network_resolvers1": "169.254.169.254",
+      "network_resolvers2": "169.254.169.253",
+      "system_clock_timezone": "America/New_York",
+      "guardium_cli_default_password": "guardium",
+      "guardium_final_pw": "Customer_CLI_Final_Password",
+      "guardium_shared_secret": "Customer_Shared_Secret_Password",
+      "guardium_central_manager_ip": "10.0.0.10",
+      "guardium_license_key": "LeaveEmptyForCollector"
+    }
+  ]
+}
+

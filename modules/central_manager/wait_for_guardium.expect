@@ -1,0 +1,343 @@
+#!/usr/bin/expect
+
+#
+# Copyright (c) IBM Corp. 2026
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# modules/central_manager/wait_for_guardium.expect
+
+# Global timeout
+set timeout 240
+
+# Arguments:
+# 0  ip
+# 1  default password
+# 2  final password
+# 3  private_ip
+# 4  subnet_mask (dotted)
+# 5  gateway
+# 6  resolver1
+# 7  resolver2
+# 8  hostname
+# 9  domain
+# 10 timezone
+# 11 license_key
+# 12 shared_secret        (currently unused)
+# 13 central_manager_ip   (currently unused)
+set ip                 [lindex $argv 0]
+set default_pw         [lindex $argv 1]
+set final_pw           [lindex $argv 2]
+set private_ip         [lindex $argv 3]
+set subnet_mask        [lindex $argv 4]
+set gateway            [lindex $argv 5]
+set resolver1          [lindex $argv 6]
+set resolver2          [lindex $argv 7]
+set hostname           [lindex $argv 8]
+set domain             [lindex $argv 9]
+set timezone           [lindex $argv 10]
+set license_key        [lindex $argv 11]
+set shared_secret      [lindex $argv 12]
+set central_manager_ip [lindex $argv 13]
+
+# Setup logging
+set timestamp [clock format [clock seconds] -format "%Y%m%d_%H%M%S"]
+set logdir "logs/guardium_config"
+file mkdir $logdir
+set logfile "$logdir/guardium_config_${ip}_${timestamp}.log"
+set log [open $logfile w]
+
+# Simple logging helper
+proc log_msg {msg} {
+    global log
+    set ts [clock format [clock seconds] -format "%Y-%m-%d %H:%M:%S"]
+    puts "\[$ts] $msg"
+    puts $log "\[$ts] $msg"
+    flush $log
+}
+
+log_msg "=== Guardium Configuration Started ==="
+log_msg "IP: $ip"
+log_msg "Hostname: $hostname"
+log_msg "Domain: $domain"
+log_msg "Private IP: $private_ip"
+log_msg "Subnet Mask: $subnet_mask"
+log_msg "Gateway: $gateway"
+log_msg "Resolver1: $resolver1"
+log_msg "Resolver2: $resolver2"
+log_msg "Timezone: $timezone"
+log_msg "Log File: $logfile"
+log_msg "=========================================="
+
+# Enable debug (comment out when stable)
+exp_internal 1
+
+########################################################################
+# Phase 1: Initial SSH session for forced password change
+########################################################################
+
+log_msg "Starting first SSH session for initial password change"
+
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=20 cli@$ip
+
+# Track if we completed the password change
+set pw_changed 0
+
+expect {
+    -re "password:" {
+        log_msg "Received password prompt for first login (default password)"
+        send -- "$default_pw\r"
+        exp_continue
+    }
+    -re "You are required to change your password" {
+        log_msg "Password change required - proceeding with first password change"
+        expect -re "Current password:"
+        send -- "$default_pw\r"
+        expect -re "New password:"
+        send -- "$final_pw\r"
+        expect -re "Retype new password:"
+        send -- "$final_pw\r"
+        expect {
+            -re "all authentication tokens updated successfully" {
+                log_msg "First password change successful"
+                set pw_changed 1
+                # After this, ssh will usually close the session
+            }
+            timeout {
+                log_msg "ERROR: Timeout waiting for password change confirmation"
+                close $log
+                exit 1
+            }
+        }
+        # no exp_continue here – we’re done with this session
+    }
+    -re "IBM Guardium, Command Line Interface \\(CLI\\)" {
+        # Just banner, keep waiting for password or change prompt
+        exp_continue
+    }
+    -re "Last login:" {
+        exp_continue
+    }
+    -re "WARNING:" {
+        exp_continue
+    }
+    timeout {
+        log_msg "ERROR: Timeout during initial login/password change"
+        close $log
+        exit 1
+    }
+    eof {
+        # SSH closed – this is expected *if* we already changed the password
+        # We'll decide based on pw_changed below.
+    }
+}
+
+if { $pw_changed } {
+    log_msg "First SSH session finished after password change (expected)"
+} else {
+    log_msg "ERROR: First SSH session ended before password change completed"
+    close $log
+    exit 1
+}
+
+# IMPORTANT:
+# Do NOT send "quit" here; the ssh session is already closed.
+# Phase 2 will start a fresh ssh with the new password.
+
+########################################################################
+# Phase 2: Second SSH session for network configuration + restart
+########################################################################
+
+log_msg "Starting second SSH session for network configuration"
+
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=60 cli@$ip
+set timeout 240
+
+expect {
+    -re "password:" {
+        log_msg "Reconnected - sending final password"
+        send -- "$final_pw\r"
+        exp_continue
+    }
+    -re "IBM Guardium, Command Line Interface \\(CLI\\)" {
+        exp_continue
+    }
+    -re "Last login:" {
+        exp_continue
+    }
+    -re "WARNING:" {
+        exp_continue
+    }
+    -re ">" {
+        log_msg "Successfully reconnected to Guardium CLI (network config phase)"
+    }
+    timeout {
+        log_msg "ERROR: Timeout waiting for CLI prompt during network config phase"
+        close $log
+        exit 1
+    }
+    eof {
+        log_msg "ERROR: Connection failed during network config phase"
+        close $log
+        exit 1
+    }
+}
+
+# Ensure we are definitely at the prompt
+expect ">"
+log_msg "Starting network configuration"
+
+# Network config
+log_msg "Setting network interface IP: $private_ip"
+send -- "store network interface ip $private_ip\r"
+expect ">"
+
+log_msg "Setting network interface mask: $subnet_mask"
+send -- "store network interface mask $subnet_mask\r"
+expect ">"
+
+log_msg "Setting default route: $gateway"
+send -- "store network routes defaultroute $gateway\r"
+expect ">"
+
+log_msg "Setting resolvers: $resolver1 $resolver2"
+send -- "store net resolvers $resolver1 $resolver2\r"
+expect ">"
+
+log_msg "Setting system hostname: $hostname"
+send -- "store system hostname $hostname\r"
+expect "(y/n)?"
+send -- "n\r"
+expect ">"
+
+log_msg "Setting system domain: $domain"
+send -- "store system domain $domain\r"
+expect ">"
+
+log_msg "Setting timezone: $timezone"
+send -- "store system clock timezone $timezone\r"
+expect ">"
+
+log_msg "Initiating network restart"
+set timeout 300
+send -- "restart network\r"
+
+# Confirm restart
+expect {
+    -re "(Yes/No)" {
+        send -- "Yes\r"
+    }
+    timeout {
+        log_msg "Did not see network restart confirmation prompt, continuing anyway"
+    }
+}
+
+# Wait for connection to drop
+expect {
+    eof {
+        log_msg "Network restart initiated, connection closed as expected"
+    }
+    timeout {
+        log_msg "Network restart timeout - connection still up, continuing anyway"
+    }
+}
+
+# Give Guardium time to bring the network back
+log_msg "Waiting 30 seconds for network restart to complete..."
+sleep 30
+
+########################################################################
+# Phase 3: Third SSH session for license installation and verification
+########################################################################
+
+log_msg "Reconnecting after network restart for license installation"
+
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=60 cli@$ip
+set timeout 240
+
+expect {
+    -re "password:" {
+        log_msg "Reconnected after restart - sending final password"
+        send -- "$final_pw\r"
+        exp_continue
+    }
+    -re "IBM Guardium, Command Line Interface \\(CLI\\)" {
+        exp_continue
+    }
+    -re "Last login:" {
+        exp_continue
+    }
+    -re "WARNING:" {
+        exp_continue
+    }
+    -re ">" {
+        log_msg "Successfully reconnected to Guardium CLI (license phase)"
+    }
+    timeout {
+        log_msg "ERROR: Timeout waiting for CLI prompt after network restart"
+        close $log
+        exit 1
+    }
+    eof {
+        log_msg "ERROR: Connection failed after network restart"
+        close $log
+        exit 1
+    }
+}
+
+log_msg "Installing license..."
+
+# Trigger license input
+send -- "store license\r"
+
+# Wait for license paste prompt
+expect "Please paste the string received from customer services. Then press <ENTER> to continue."
+log_msg "Received license paste prompt - sending license key"
+
+# Send license key, then ENTER again as required
+send -- "$license_key\r"
+send -- "\r"
+
+# Wait for command completion and prompt
+expect ">"
+log_msg "License installation completed"
+
+log_msg "Running verification commands"
+
+send -- "show network interface all\r"
+expect ">"
+log_msg "Network interface verification completed"
+
+send -- "show network routes defaultroute\r"
+expect ">"
+log_msg "Default route verification completed"
+
+send -- "show network resolver all\r"
+expect ">"
+log_msg "DNS resolver verification completed"
+
+send -- "show system hostname\r"
+expect ">"
+log_msg "Hostname verification completed"
+
+send -- "show system domain\r"
+expect ">"
+log_msg "Domain verification completed"
+
+send -- "show unit type\r"
+expect ">"
+log_msg "Unit type verification completed"
+
+log_msg "Exiting Guardium CLI"
+send -- "quit\r"
+expect eof
+
+log_msg "=== Guardium configuration completed successfully ==="
+log_msg "Log saved to: $logfile"
+
+close $log
+
+puts "Guardium configuration completed successfully"
+puts "Detailed log saved to: $logfile"
+
+exit 0
