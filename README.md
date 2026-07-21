@@ -20,7 +20,7 @@ To get started deploying GDP machines, follow the instructions in each of the ex
 
 ## Before Starting
 
-To download the repository from the Terraform Registry, click on the View Source button on the front page of the project. This will open the GitHub repository. From there you can download the code to your computer using normal Git commands, such as:
+To download the examples on how to use this module from the Terraform Registry, click on the View Source button on the front page of the project. This will open the GitHub repository. From there you can download the code to your computer using normal Git commands, such as:
 
 ```
 git clone https://github.com/IBM/terraform-gcp-gdp.git
